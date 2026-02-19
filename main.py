@@ -32,4 +32,4 @@ def chat_response(user_prompt, prompt_token, response_token, response):
         print(f"User prompt: {user_prompt}\nPrompt tokens: {prompt_token}\nResponse tokens: {response_token}\nResponse:\n{response}")
     if args.verbose == False:
         print(f"{response}")
-chat_response(args.user_prompt, prompt_token, response_token, response.text)
+chat_response(args.user_prompt, prompt_token, response_token, response.text.replace("**", ""))
