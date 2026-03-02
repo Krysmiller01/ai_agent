@@ -4,6 +4,7 @@ from google import genai
 import argparse
 from google.genai import types
 from prompts import system_prompt
+from call_function import available_functions
 
 load_dotenv()
 try:
@@ -20,7 +21,7 @@ messages =[types.Content(role="user", parts=[types.Part(text=args.user_prompt)])
 response = client.models.generate_content(
     model ="gemini-2.5-flash",
     contents=messages,
-    config=types.GenerateContentConfig(system_instruction=system_prompt),
+    config=types.GenerateContentConfig(tools=[available_functions], system_instruction=system_prompt),
     )
 if response.usage_metadata is None:
     raise RuntimeError("data was none dude")
@@ -30,8 +31,12 @@ prompt_token = usage.prompt_token_count
 response_token = usage.candidates_token_count
 
 def chat_response(user_prompt, prompt_token, response_token, response):
-    if args.verbose == True:
+    if args.verbose:
         print(f"User prompt: {user_prompt}\nPrompt tokens: {prompt_token}\nResponse tokens: {response_token}\nResponse:\n{response}")
-    if args.verbose == False:
-        print(f"{response}")
-chat_response(args.user_prompt, prompt_token, response_token, response.text.replace("**", ""))
+        
+    if response.function_calls:
+        for function_call in response.function_calls:
+            print(f"Calling function: {function_call.name}({function_call.args})")
+    else:
+        print(response.text)
+chat_response(args.user_prompt, prompt_token, response_token, response)
