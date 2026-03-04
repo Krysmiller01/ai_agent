@@ -12,45 +12,84 @@ try:
 except:
     raise RuntimeError("key = None maybe?")
 
+
 client = genai.Client(api_key=api_key)
+
 parser = argparse.ArgumentParser(description="Chatbot")
+
 parser.add_argument("user_prompt", type=str, help="User prompt")
-parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
+
+parser.add_argument("--verbose", action="store_true", help="Enable verbose output") 
+
 args = parser.parse_args()
+
 messages =[types.Content(role="user", parts=[types.Part(text=args.user_prompt)])]
-response = client.models.generate_content(
-    model ="gemini-2.5-flash",
-    contents=messages,
-    config=types.GenerateContentConfig(tools=[available_functions], system_instruction=system_prompt),
-    )
-if response.usage_metadata is None:
-    raise RuntimeError("data was none dude")
-    
-usage = response.usage_metadata
-prompt_token = usage.prompt_token_count
-response_token = usage.candidates_token_count
 
 def chat_response(user_prompt, prompt_token, response_token, response):
+    function_responses = []
     if args.verbose:
         print(f"User prompt: {user_prompt}\nPrompt tokens: {prompt_token}\nResponse tokens: {response_token}")
         
     if response.function_calls:
-        function_responses = []
+
         verbose = args.verbose
+
         for function_call in response.function_calls:
             
             function_call_result = call_function(function_call, verbose)
             
             if not function_call_result.parts:
                 raise Exception("Tool result had no parts")
+
             fr = function_call_result.parts[0].function_response
+
             if fr is None:
                 raise Exception("Tool result missing function_response")
+
             if fr.response is None:
                 raise Exception("Tool result missing function_response.response")
+
             if verbose:
                 print(f"-> {fr.response}")
+
             function_responses.append(function_call_result.parts[0])
     else:
         print(response.text)
-chat_response(args.user_prompt, prompt_token, response_token, response)
+    return function_responses
+
+for _ in range(20):
+
+    response = client.models.generate_content(
+        model ="gemini-2.5-flash",
+        contents=messages,
+        config=types.GenerateContentConfig(tools=[available_functions], system_instruction=system_prompt),
+    )
+
+    if response.candidates:
+        for candidate in response.candidates:
+            if candidate.content:
+                messages.append(candidate.content)
+
+    if response.usage_metadata is None:
+        raise RuntimeError("data was none dude")
+    
+    usage = response.usage_metadata
+
+    prompt_token = usage.prompt_token_count
+
+    response_token = usage.candidates_token_count
+
+    function_responses = chat_response(args.user_prompt, prompt_token, response_token, response)
+
+    if function_responses:
+        messages.append(types.Content(role="user", parts=function_responses))
+    else:
+        break
+else:
+    print("Error: Maximum iterations reached without a final response.")
+    sys.exit(1)
+    
+    
+
+
+
