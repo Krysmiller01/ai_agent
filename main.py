@@ -4,7 +4,7 @@ from google import genai
 import argparse
 from google.genai import types
 from prompts import system_prompt
-from call_function import available_functions
+from call_function import available_functions, call_function
 
 load_dotenv()
 try:
@@ -32,11 +32,25 @@ response_token = usage.candidates_token_count
 
 def chat_response(user_prompt, prompt_token, response_token, response):
     if args.verbose:
-        print(f"User prompt: {user_prompt}\nPrompt tokens: {prompt_token}\nResponse tokens: {response_token}\nResponse:\n{response}")
+        print(f"User prompt: {user_prompt}\nPrompt tokens: {prompt_token}\nResponse tokens: {response_token}")
         
     if response.function_calls:
+        function_responses = []
+        verbose = args.verbose
         for function_call in response.function_calls:
-            print(f"Calling function: {function_call.name}({function_call.args})")
+            
+            function_call_result = call_function(function_call, verbose)
+            
+            if not function_call_result.parts:
+                raise Exception("Tool result had no parts")
+            fr = function_call_result.parts[0].function_response
+            if fr is None:
+                raise Exception("Tool result missing function_response")
+            if fr.response is None:
+                raise Exception("Tool result missing function_response.response")
+            if verbose:
+                print(f"-> {fr.response}")
+            function_responses.append(function_call_result.parts[0])
     else:
         print(response.text)
 chat_response(args.user_prompt, prompt_token, response_token, response)
